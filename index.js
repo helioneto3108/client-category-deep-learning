@@ -81,6 +81,20 @@ async function trainModel(inputXs, outputYs) {
     return model
 }
 
+// Criando formula de predição do modelo
+async function predicao(modelo, novoCliente) {
+    // transformar array do cliente a ser predizido em tensor (tfjs)
+    const tensortf = tf.tensor2d(novoCliente)
+
+    // Faz a predição (output será um vetor de 3 probabilidades)
+    const pred = modelo.predict(tensortf)
+    const predArray = await pred.array()
+
+    return predArray[0].map(
+        (prob, index) => ({prob, index}) // abrev : { prob: prob, index: index }
+    )
+}
+
 // Exemplo de pessoas para treino (cada pessoa com idade, cor e localização)
 // const pessoas = [
 //     { nome: "Erick", idade: 30, cor: "azul", localizacao: "São Paulo" },
@@ -115,7 +129,40 @@ const tensorLabels = [
 ];
 
 // Criamos tensores de entrada (xs) e saída (ys) para treinar o modelo
-const inputXs = tf.tensor2d(tensorPessoasNormalizado)
+const featureXs = tf.tensor2d(tensorPessoasNormalizado)
 const outputYs = tf.tensor2d(tensorLabels)
 
-const modelo = trainModel(inputXs, outputYs)
+const model = await trainModel(featureXs, outputYs)
+
+const pessoa = [{
+    nome: 'Helio',
+    idade: 26,
+    cor: 'azul',
+    localizacao: 'Rio'
+}]
+
+// Normalizando a idade da nova pessoa usando o mesmo padrão do treino
+// Exemplo: idade_min = 25, idade_max = 40, então (26 - 25) / (40 - 25 ) = 0.06
+const pessoaTensorNormalizado = [
+    [
+        0.06, // idade normalizada
+        1,    // cor azul
+        0,    // cor vermelho
+        0,    // cor verde
+        0,    // localização São Paulo
+        1,    // localização Rio
+        0     // localização Curitiba
+    ]
+]
+
+const predict = await predicao(model, pessoaTensorNormalizado)
+
+const result = predict
+    .sort(
+        (a,b) => b.prob - a.prob // inverter o `a` e o `b` deixa a ordenaçar em DESC
+    )
+    .map(
+        resultado => `${labelsNomes[resultado.index]} (${(resultado.prob * 100).toFixed(2)}%)`
+    )
+    .join('\n')
+console.log(result)
